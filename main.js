@@ -18,7 +18,7 @@ function graphForever (startY,endY,arrowWidth = 30) {
     [endX,(startY+endY)/2],
     [endX-arrowWidth,endY],
     [startX,endY],
-  ],{fillColor = "#f77", strokeColor = "#f00"})
+  ],{fillColor: "#f77", strokeColor: "#f00"})
 }
 
 function display () {
@@ -36,3 +36,4 @@ draw.line(arrowX[0], arrowX[1], arrowX[0]-arrowW, arrowX[1]+arrowW, 'black', 1)
 draw.line(margin, pageHeight-(margin+axisMargin), arrowX[0], arrowX[1], 'black', 1);
 draw.line(arrowY[0], arrowY[1], arrowY[0]-arrowW, arrowY[1]+arrowW, 'black', 1)
 draw.line(arrowY[0], arrowY[1], arrowY[0]+arrowW, arrowY[1]+arrowW, 'black', 1)
+display()
