@@ -4,7 +4,7 @@ const pageWidth = 794;
 const pageHeight = 1123;
 const margin = 20;
 const axisMargin = 20;
-const innerMargin = 10;
+const innerMargin = 20;
 
 const canvas = document.getElementById('c');
 const draw = new DrawUtil(canvas);
@@ -18,7 +18,7 @@ function graphForever (startY,endY,arrowWidth = 30) {
     [endX,(startY+endY)/2],
     [endX-arrowWidth,endY],
     [startX,endY],
-  ],{fillColor: "#f77", strokeColor: "#f00"})
+  ],{fillColor: "#f77", strokeColor: "#f00", lineWidth: 3, fill: true})
 }
 
 function display () {
