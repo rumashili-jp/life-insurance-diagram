@@ -11,9 +11,9 @@ const draw = new DrawUtil(canvas);
 
 // 初期描画
 const arrowX = [pageWidth-margin, pageHeight-(margin+axisMargin)]
-const arrowY = [margin+axisMargin, pageHeight-margin]
+const arrowY = [margin+axisMargin, margin]
 const arrowW = axisMargin/2
-draw.line(margin+axisMargin, margin, arrowY[0], arrowY[1], 'black', 1);
+draw.line(margin+axisMargin, pageHeight-margin, arrowY[0], arrowY[1], 'black', 1);
 draw.line(arrowX[0], arrowX[1], arrowX[0]-arrowW, arrowX[1]-arrowW, 'black', 1)
 draw.line(arrowX[0], arrowX[1], arrowX[0]-arrowW, arrowX[1]+arrowW, 'black', 1)
 draw.line(margin, pageHeight-(margin+axisMargin), arrowX[0], arrowX[1], 'black', 1);
