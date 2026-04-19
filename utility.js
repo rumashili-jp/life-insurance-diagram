@@ -37,4 +37,44 @@ export class DrawUtil {
     ctx.font = `${Math.round(size)}px sans-serif`;
     ctx.fillText(str, Math.round(x), Math.round(y));
   }
+  polygon(coords, opts = {}) {
+    const ctx = this.ctx;
+
+    if (!coords || coords.length < 2) return;
+
+    const {
+      fill = false,
+      fillColor = '#000',
+      stroke = true,
+      strokeColor = '#000',
+      lineWidth = 1,
+      close = true
+    } = opts;
+
+    ctx.beginPath();
+
+    // 最初の点
+    ctx.moveTo(Math.round(coords[0][0]), Math.round(coords[0][1]));
+
+    // 残りの点
+    for (let i = 1; i < coords.length; i++) {
+      const [x, y] = coords[i];
+      ctx.lineTo(Math.round(x), Math.round(y));
+    }
+
+    if (close) ctx.closePath();
+
+    // 塗り
+    if (fill) {
+      ctx.fillStyle = fillColor;
+      ctx.fill();
+    }
+
+    // 枠線
+    if (stroke) {
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+    }
+  }
 }
