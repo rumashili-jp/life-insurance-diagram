@@ -9,7 +9,6 @@
     <style>
         body { background-color: #f3f4f6; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; }
         
-        /* カードのデザイン調整：ドラッグしやすく判定を広く */
         .card { 
             background: white; 
             border-radius: 12px; 
@@ -18,7 +17,7 @@
             margin-bottom: 16px; 
             cursor: grab; 
             transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
-            touch-action: none; /* ブラウザのスクロールと干渉しないように */
+            touch-action: none; 
             border: 2px solid transparent;
         }
         .card:active { cursor: grabbing; }
@@ -34,7 +33,6 @@
             border-radius: 4px;
         }
         
-        /* 入力要素の上ではドラッグを無効化して入力を優先 */
         .card input, .card button, .card select {
             cursor: auto;
         }
@@ -49,7 +47,6 @@
         }
         canvas { width: 100%; height: auto; }
 
-        /* スクロールバーのカスタマイズ */
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -90,7 +87,7 @@
                 </div>
             </div>
 
-            <!-- プランカードリスト (ドラッグ・タッチ対応) -->
+            <!-- プランカードリスト -->
             <div id="plan-list"></div>
             
             <button onclick="app.addPlan()" class="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:text-blue-500 hover:border-blue-300 hover:bg-blue-50 transition-all mb-32 font-bold text-sm uppercase tracking-wider">
@@ -98,7 +95,7 @@
             </button>
         </div>
 
-        <!-- 左下固定エリア: エクスポートボタン -->
+        <!-- 左下固定エリア -->
         <div class="py-4 bg-gray-100 mt-auto border-t">
             <button onclick="app.downloadPDF()" class="w-full bg-slate-800 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-black active:transform active:scale-95 transition-all flex items-center justify-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -118,7 +115,6 @@
 <script>
 /**
  * 描画用ライブラリ: ChartRenderer
- * (変更不可の要件に従い保持)
  */
 class ChartRenderer {
     constructor(canvas) {
@@ -169,35 +165,61 @@ class ChartRenderer {
         }
     }
 
-    arrowBar({ x, y, w, h, color, label }) {
+    // 画像に基づく新しい描画ロジックの追加
+    drawInsuranceShape({ x, y, w, h, color, label, shapeType }) {
         const sx = this.s(x);
         const sy = this.s(y);
         const sw = this.s(w);
         const sh = this.s(h);
-
         this.ctx.fillStyle = color;
         this.ctx.beginPath();
-        this.ctx.moveTo(sx, sy);
-        this.ctx.lineTo(sx + sw - this.s(15), sy);
-        this.ctx.lineTo(sx + sw, sy + sh/2);
-        this.ctx.lineTo(sx + sw - this.s(15), sy + sh);
-        this.ctx.lineTo(sx, sy + sh);
+
+        if (shapeType === 'rect') {
+            // 四角形（定額）
+            this.ctx.rect(sx, sy, sw, sh);
+        } else if (shapeType === 'trapezoid') {
+            // 台形（逓減・変化）
+            this.ctx.moveTo(sx, sy);
+            this.ctx.lineTo(sx + sw, sy + sh * 0.7); // 右側を少し下げる
+            this.ctx.lineTo(sx + sw, sy + sh);
+            this.ctx.lineTo(sx, sy + sh);
+        } else if (shapeType === 'lifetime') {
+            // 杭型（一生涯）
+            this.ctx.moveTo(sx, sy);
+            this.ctx.lineTo(sx + sw - this.s(20), sy);
+            this.ctx.lineTo(sx + sw, sy + sh/2); // 先端を尖らせる
+            this.ctx.lineTo(sx + sw - this.s(20), sy + sh);
+            this.ctx.lineTo(sx, sy + sh);
+        } else {
+            // デフォルト：アローバー（既存互換）
+            this.ctx.moveTo(sx, sy);
+            this.ctx.lineTo(sx + sw - this.s(15), sy);
+            this.ctx.lineTo(sx + sw, sy + sh/2);
+            this.ctx.lineTo(sx + sw - this.s(15), sy + sh);
+            this.ctx.lineTo(sx, sy + sh);
+        }
+
         this.ctx.closePath();
         this.ctx.fill();
-
-        if (label) this.text({ text: label, x: x + 10, y: y + h/2 + 5, size: 14, bold: true });
+        
+        if (label) {
+            this.ctx.save();
+            this.ctx.clip(); // 図形からはみ出さないように
+            this.text({ text: label, x: x + 10, y: y + h/2 + 5, size: 14, bold: true });
+            this.ctx.restore();
+        }
     }
+
+    // 既存互換用
+    arrowBar(args) { this.drawInsuranceShape({...args, shapeType: 'arrow'}); }
 }
 
-/**
- * アプリケーション本体
- */
 const app = {
     renderer: null,
     plans: [
-        { id: 1, type: '死亡保障', name: 'マーケットリンク', amount: '500万円', cost: '13,515', endAge: 55, color: '#A8D600' },
-        { id: 2, type: '入院保障', name: 'メディカルKit NEO', amount: '日額5,000円', cost: '1,910', endAge: 65, color: '#F3A8C3' },
-        { id: 3, type: 'がん保障', name: 'がん治療支援保険', amount: '診断給付100万円', cost: '1,736', endAge: 99, color: '#DCE6F2' }
+        { id: 1, type: '死亡保障', name: 'マーケットリンク', amount: '500万円', cost: '13,515', endAge: 55, color: '#A8D600', shape: 'rect' },
+        { id: 2, type: '死亡保障', name: '家計保障定期NEO', amount: '5万円/月', cost: '3,145', endAge: 65, color: '#FFD966', shape: 'trapezoid' },
+        { id: 3, type: '入院保障', name: 'メディカルKit NEO', amount: '日額5,000円', cost: '1,910', endAge: 65, color: '#F3A8C3', shape: 'lifetime' }
     ],
 
     init() {
@@ -208,57 +230,29 @@ const app = {
         this.update();
     },
 
-    /**
-     * ドラッグ＆ドロップおよびタッチ操作のセットアップ
-     */
     setupDragAndDrop() {
         const container = document.getElementById('plan-list');
-        
-        // PC用マウスドラッグ
         container.addEventListener('dragstart', (e) => {
             const card = e.target.closest('.card');
-            if (card) {
-                card.classList.add('dragging');
-                e.dataTransfer.effectAllowed = 'move';
-            }
+            if (card) { card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
         });
-
         container.addEventListener('dragend', (e) => {
             const card = e.target.closest('.card');
-            if (card) {
-                card.classList.remove('dragging');
-                this.syncOrderFromUI();
-            }
+            if (card) { card.classList.remove('dragging'); this.syncOrderFromUI(); }
         });
+        container.addEventListener('dragover', (e) => { e.preventDefault(); this.handleSort(e.clientY); });
 
-        container.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            this.handleSort(e.clientY);
-        });
-
-        // タッチ操作対応
         container.addEventListener('touchstart', (e) => {
             const card = e.target.closest('.card');
             if (card && !['INPUT', 'BUTTON', 'SELECT'].includes(e.target.tagName)) {
-                this.touchActiveCard = card;
-                card.classList.add('dragging');
+                this.touchActiveCard = card; card.classList.add('dragging');
             }
         }, { passive: true });
-
         container.addEventListener('touchmove', (e) => {
-            if (this.touchActiveCard) {
-                e.preventDefault();
-                const touch = e.touches[0];
-                this.handleSort(touch.clientY);
-            }
+            if (this.touchActiveCard) { e.preventDefault(); this.handleSort(e.touches[0].clientY); }
         }, { passive: false });
-
         container.addEventListener('touchend', (e) => {
-            if (this.touchActiveCard) {
-                this.touchActiveCard.classList.remove('dragging');
-                this.touchActiveCard = null;
-                this.syncOrderFromUI();
-            }
+            if (this.touchActiveCard) { this.touchActiveCard.classList.remove('dragging'); this.touchActiveCard = null; this.syncOrderFromUI(); }
         });
     },
 
@@ -266,30 +260,25 @@ const app = {
         const container = document.getElementById('plan-list');
         const draggingCard = container.querySelector('.dragging');
         if (!draggingCard) return;
-
         const siblings = [...container.querySelectorAll('.card:not(.dragging)')];
         const nextSibling = siblings.find(sibling => {
             const box = sibling.getBoundingClientRect();
             return clientY <= box.top + box.height / 2;
         });
-        
-        if (nextSibling !== draggingCard.nextSibling) {
-            container.insertBefore(draggingCard, nextSibling);
-        }
+        if (nextSibling !== draggingCard.nextSibling) container.insertBefore(draggingCard, nextSibling);
     },
 
     syncOrderFromUI() {
         const container = document.getElementById('plan-list');
         const cardElements = [...container.querySelectorAll('.card')];
         const newOrderIds = cardElements.map(el => parseInt(el.dataset.id));
-        
         this.plans = newOrderIds.map(id => this.plans.find(p => p.id === id));
         this.update();
     },
 
     addPlan() {
         const id = Date.now();
-        this.plans.push({ id, type: '保障', name: '新プラン', amount: '100万円', cost: '1,000', endAge: 65, color: '#e2e8f0' });
+        this.plans.push({ id, type: '保障', name: '新プラン', amount: '100万円', cost: '1,000', endAge: 65, color: '#e2e8f0', shape: 'rect' });
         this.renderPlansUI();
         this.update();
     },
@@ -314,30 +303,52 @@ const app = {
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>
                     </div>
                     <div class="flex-1">
-                        <input type="text" value="${plan.type}" class="font-bold text-sm text-blue-600 bg-transparent border-none p-0 w-full outline-none focus:ring-0" oninput="app.updatePlan(${plan.id}, 'type', this.value)" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
+                        <select class="font-bold text-sm text-blue-600 bg-transparent border-none p-0 outline-none focus:ring-0 cursor-pointer" onchange="app.updatePlan(${plan.id}, 'type', this.value)">
+                            <option value="死亡保障" ${plan.type === '死亡保障' ? 'selected' : ''}>死亡保障</option>
+                            <option value="入院保障" ${plan.type === '入院保障' ? 'selected' : ''}>入院保障</option>
+                            <option value="がん保障" ${plan.type === 'がん保障' ? 'selected' : ''}>がん保障</option>
+                            <option value="就業不能" ${plan.type === '就業不能' ? 'selected' : ''}>就業不能</option>
+                        </select>
                     </div>
                     <button onclick="app.removePlan(${plan.id})" class="text-gray-300 hover:text-red-500 transition-colors p-1" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                     </button>
                 </div>
                 <div class="space-y-3" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
-                    <input type="text" value="${plan.name}" placeholder="保険名" class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none transition-all" oninput="app.updatePlan(${plan.id}, 'name', this.value)">
+                    <div class="grid grid-cols-2 gap-2 items-end">
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-400 font-bold ml-1 uppercase">グラフの形</label>
+                            <select class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" onchange="app.updatePlan(${plan.id}, 'shape', this.value)">
+                                <option value="rect" ${plan.shape === 'rect' ? 'selected' : ''}>■ 定額 (四角)</option>
+                                <option value="trapezoid" ${plan.shape === 'trapezoid' ? 'selected' : ''}>▲ 逓減 (台形)</option>
+                                <option value="lifetime" ${plan.shape === 'lifetime' ? 'selected' : ''}>▶ 終身 (杭型)</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-400 font-bold ml-1 uppercase">色</label>
+                            <input type="color" value="${plan.color}" class="w-full h-9 rounded border cursor-pointer p-0 overflow-hidden" oninput="app.updatePlan(${plan.id}, 'color', this.value)">
+                        </div>
+                    </div>
+                    
+                    <input type="text" value="${plan.name}" placeholder="保険名 (例: マーケットリンク)" class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none transition-all" oninput="app.updatePlan(${plan.id}, 'name', this.value)">
+                    
                     <div class="grid grid-cols-2 gap-2">
                         <div class="space-y-1">
-                            <label class="text-[10px] text-gray-400 font-bold ml-1 uppercase">保障額</label>
-                            <input type="text" value="${plan.amount}" placeholder="保障額" class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" oninput="app.updatePlan(${plan.id}, 'amount', this.value)">
+                            <label class="text-[10px] text-gray-400 font-bold ml-1 uppercase">${plan.shape === 'trapezoid' ? '開始額' : '保障額'}</label>
+                            <input type="text" value="${plan.amount}" placeholder="500万円" class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" oninput="app.updatePlan(${plan.id}, 'amount', this.value)">
                         </div>
                         <div class="space-y-1">
                             <label class="text-[10px] text-gray-400 font-bold ml-1 uppercase">保険料</label>
-                            <input type="text" value="${plan.cost}" placeholder="保険料" class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" oninput="app.updatePlan(${plan.id}, 'cost', this.value)">
+                            <input type="text" value="${plan.cost}" placeholder="10,000" class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" oninput="app.updatePlan(${plan.id}, 'cost', this.value)">
                         </div>
                     </div>
+                    
                     <div class="flex items-center gap-3 pt-1">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 w-full">
                             <span class="text-[10px] text-gray-400 font-bold uppercase whitespace-nowrap">終了年齢:</span>
-                            <input type="number" value="${plan.endAge}" class="w-16 border rounded p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" oninput="app.updatePlan(${plan.id}, 'endAge', this.value)">
+                            <input type="number" value="${plan.endAge}" class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" oninput="app.updatePlan(${plan.id}, 'endAge', this.value)">
+                            <span class="text-xs text-gray-400">歳</span>
                         </div>
-                        <input type="color" value="${plan.color}" class="ml-auto w-10 h-10 rounded-lg border-none cursor-pointer p-0 overflow-hidden" oninput="app.updatePlan(${plan.id}, 'color', this.value)">
                     </div>
                 </div>
             `;
@@ -349,6 +360,7 @@ const app = {
         const plan = this.plans.find(p => p.id === id);
         if (plan) {
             plan[key] = key === 'endAge' ? parseInt(value) || 0 : value;
+            if (key === 'shape') this.renderPlansUI(); // ラベル切り替えのためUI再描画
             this.update();
         }
     },
@@ -357,10 +369,10 @@ const app = {
         const r = this.renderer;
         const name = document.getElementById('userName').value;
         const birth = document.getElementById('birthDate').value;
-        const age = document.getElementById('userAge').value;
-
+        const age = document.getElementById('userAge').value || 0;
         r.clear();
 
+        // ヘッダー
         r.text({ text: '【おすすめプラン】', x: 40, y: 50, size: 22, bold: true });
         r.text({ text: `${name} 様`, x: 40, y: 100, size: 20, bold: true });
         r.text({ text: `${birth} 生`, x: 250, y: 100, size: 16 });
@@ -370,38 +382,53 @@ const app = {
         r.text({ text: '合計保険料：', x: 550, y: 100, size: 18 });
         r.text({ text: `${total.toLocaleString()}円/月`, x: 650, y: 100, size: 22, bold: true });
 
+        // タイムライン設定
         const startAge = parseInt(age);
         const maxAge = 100;
         const xStart = 120;
         const xEnd = 750;
         const yAxis = 950;
-        
         const ageToX = (a) => {
             const ratio = (a - startAge) / (maxAge - startAge);
-            return xStart + (xEnd - xStart) * Math.min(1, Math.max(0, ratio));
+            return xStart + (xEnd - xStart) * Math.min(1.1, Math.max(0, ratio));
         };
 
+        // 軸描画
         r.line({ x1: xStart, y1: yAxis, x2: xEnd + 20, y2: yAxis, width: 2 });
-        r.line({ x1: xEnd + 20, y1: yAxis, x2: xEnd + 10, y2: yAxis - 5 });
-        r.line({ x1: xEnd + 20, y1: yAxis, x2: xEnd + 10, y2: yAxis + 5 });
-
         [startAge, 55, 65, 70, 100].forEach(a => {
             const x = ageToX(a);
             r.line({ x1: x, y1: yAxis, x2: x, y2: 120, color: '#ddd', width: 1, dash: [5, 5] });
             r.text({ text: a === 100 ? '一生涯' : `${a}歳`, x: x, y: yAxis + 25, size: 14, align: 'center' });
         });
 
+        // 保障内容の描画
         this.plans.forEach((plan, i) => {
             const y = 180 + (i * 180);
             const w = ageToX(plan.endAge) - xStart;
+            
             r.text({ text: `【${plan.type}】`, x: 30, y: y + 20, size: 14, bold: true });
             r.text({ text: `☆${plan.name}`, x: 120, y: y - 10, size: 14, color: '#333' });
-            r.arrowBar({ x: xStart, y: y, w: w, h: 80, color: plan.color, label: plan.amount });
+            
+            // 図形タイプに合わせて描画
+            r.drawInsuranceShape({ 
+                x: xStart, y: y, w: w, h: 80, 
+                color: plan.color, 
+                label: plan.amount, 
+                shapeType: plan.shape 
+            });
+
+            // 保険料ライン
             r.text({ text: `${plan.cost}円/月`, x: xStart, y: y + 100, size: 14 });
-            r.line({ x1: xStart + 80, y1: y + 95, x2: xStart + w, y2: y + 95, width: 1.5 });
-            r.line({ x1: xStart + w, y1: y + 95, x2: xStart + w - 5, y2: y + 90 });
-            r.line({ x1: xStart + w, y1: y + 95, x2: xStart + w - 5, y2: y + 100 });
-            if (plan.endAge < 100) r.text({ text: `${plan.endAge}歳`, x: xStart + w + 10, y: y + 100, size: 14 });
+            const lineEndX = xStart + w;
+            r.line({ x1: xStart + 80, y1: y + 95, x2: lineEndX, y2: y + 95, width: 1.5 });
+            r.line({ x1: lineEndX, y1: y + 95, x2: lineEndX - 10, y2: y + 90 });
+            r.line({ x1: lineEndX, y1: y + 95, x2: lineEndX - 10, y2: y + 100 });
+            
+            if (plan.shape !== 'lifetime' && plan.endAge < 100) {
+                r.text({ text: `${plan.endAge}歳`, x: lineEndX + 10, y: y + 100, size: 14 });
+            } else if (plan.shape === 'lifetime' || plan.endAge >= 100) {
+                r.text({ text: `終身払い`, x: lineEndX + 10, y: y + 100, size: 14 });
+            }
         });
     },
 
